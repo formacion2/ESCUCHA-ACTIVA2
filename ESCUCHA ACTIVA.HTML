@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Simulador · Escucha Activa & Síntesis</title>
+<style>
+  :root{--morado:#6A1B9A;--lila:#BA68C8;--blanco:#FFFFFF;--gris:#f3f4f8;--text:#1f2937;--ok:#16a34a;--warn:#f59e0b;--bad:#ef4444}
+  *{box-sizing:border-box}
+  body{margin:0;font-family:"Segoe UI",Roboto,Arial,sans-serif;background:linear-gradient(180deg,#2b0b3a 0%,#6a1b9a 40%,#b67bd6 100%);color:var(--text);min-height:100vh;display:flex;align-items:center;justify-content:center;padding:28px}
+  
+  .app{width:1050px;max-width:100%;background:linear-gradient(180deg,rgba(255,255,255,0.98),rgba(250,245,255,0.9));border-radius:14px;box-shadow:0 16px 40px rgba(11,7,26,0.45);overflow:hidden;display:grid;grid-template-columns:1fr 380px; transition: all 0.3s ease;}
+  
+  @media (max-width:1020px){.app{grid-template-columns:1fr;width:95%}}
+  
+  header{grid-column:1/-1;padding:18px 26px;display:flex;align-items:center;gap:12px;border-bottom:1px solid rgba(106,27,154,0.08);background:linear-gradient(90deg,rgba(106,27,154,0.06),rgba(186,104,200,0.03))}
+  header h1{margin:0;font-size:20px;color:var(--morado)}
+  header .sub{font-size:13px;color:#5b2b7a;margin-left:6px}
+  .main{padding:20px 26px}
+  .inputName{flex:1;display:flex;gap:8px;align-items:center}
+  label.small{font-size:13px;color:#6b2f7f}
+  input[type="text"]{width:100%;padding:10px 12px;border-radius:10px;border:1px solid rgba(106,27,154,0.12);font-size:14px;background:rgba(255,255,255,0.95)}
+  .controls{display:flex;gap:8px;align-items:center}
+  .btn{background:var(--morado);color:var(--blanco);padding:10px 14px;border-radius:10px;border:none;cursor:pointer;font-weight:700;box-shadow:0 6px 12px rgba(106,27,154,0.18);transition:all 0.2s}
+  .btn:hover:not(:disabled){transform:translateY(-2px);box-shadow:0 8px 16px rgba(106,27,154,0.25)}
+  .btn:disabled{opacity:0.5;cursor:not-allowed;transform:none}
+  .btn.secondary{background:transparent;color:var(--morado);border:1px solid rgba(106,27,154,0.2);box-shadow:none}
+  .btn.secondary:hover:not(:disabled){background:rgba(106,27,154,0.05)}
+  .btn.small{padding:8px 10px;font-size:14px}
+  
+  .card{background:linear-gradient(180deg,white,#fbf6ff);border-radius:12px;padding:16px;border:1px solid rgba(106,27,154,0.06);box-shadow:0 6px 18px rgba(106,27,154,0.06);margin-bottom:14px}
+  .scenarioTitle{font-weight:700;color:var(--morado);margin-bottom:8px}
+  .clientBox{background:linear-gradient(90deg,#fff,#faf3ff);padding:14px;border-radius:10px;border:1px solid rgba(106,27,154,0.04);min-height:70px;display:flex;align-items:center;gap:12px}
+  .clientTextHidden{display:none}
+  
+  .synthesisArea textarea{width:100%;min-height:130px;padding:12px;border-radius:10px;border:1px solid rgba(106,27,154,0.12);font-size:14px;resize:vertical;font-family:inherit}
+  .synthesisArea textarea:focus{outline:2px solid var(--lila);border-color:transparent}
+  
+  .guide{background:linear-gradient(90deg,#f9f5ff,#fff);border-radius:8px;padding:10px;border:1px solid rgba(106,27,154,0.06);color:#4b2a66;font-size:13px}
+  .side{padding:20px;background:linear-gradient(180deg,#f8f2fb,#fbf7ff);border-left:1px solid rgba(106,27,154,0.03)}
+  .scoreBox{display:flex;flex-direction:column;gap:10px}
+  .scoreBig{font-size:28px;font-weight:800;color:var(--morado)}
+  .badge{padding:8px 10px;border-radius:999px;font-weight:700;display:inline-block;font-size:12px}
+  .badge.ok{background:rgba(22,163,74,0.12);color:var(--ok);border:1px solid rgba(22,163,74,0.14)}
+  .badge.warn{background:rgba(245,158,11,0.08);color:var(--warn);border:1px solid rgba(245,158,11,0.10)}
+  .badge.bad{background:rgba(239,68,68,0.08);color:var(--bad);border:1px solid rgba(239,68,68,0.10)}
+  footer{grid-column:1/-1;padding:14px 26px;border-top:1px solid rgba(106,27,154,0.04);display:flex;justify-content:space-between;align-items:center;background:linear-gradient(90deg,rgba(186,104,200,0.02),transparent)}
+  
+  /* Animaciones simples */
+  .fade-in {animation: fadeIn 0.4s ease-in-out;}
+  @keyframes fadeIn { from { opacity:0; transform:translateY(5px); } to { opacity:1; transform:translateY(0); } }
+</style>
+</head>
+<body>
+<div class="app" id="appContainer" role="application" aria-label="Simulador de escucha activa">
+  <header>
+    <div>
+      <h1>Simulador · Escucha Activa & Síntesis</h1>
+      <div class="sub">Entrena la escucha real: la IA lee al cliente, el asesor escucha y sintetiza</div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div style="display:flex;gap:12px;align-items:center;margin-bottom:12px">
+      <div class="inputName">
+        <label class="small" for="advisorName">Asesor:</label>
+        <input id="advisorName" type="text" placeholder="Nombre y apellido (ej. Juan Pérez)">
+      </div>
+      <div class="controls">
+        <button id="btnStart" class="btn">▶️ Iniciar</button>
+        <button id="btnReplay" class="btn secondary" disabled title="Repetir audio del cliente">🔁 Reproducir</button>
+        <button id="btnDownload" class="btn" style="display:none">⬇ Descargar Reporte</button>
+        <button id="btnReset" class="btn secondary" style="display:none">Reiniciar</button>
+      </div>
+    </div>
+
+    <div id="gameArea" class="card" style="min-height:300px">
+      <div class="scenarioTitle">Escucha del cliente</div>
+      <div class="clientBox">
+        <div id="clientHidden" class="clientTextHidden">TEXTO OCULTO</div>
+        <div style="flex:1">
+          <div style="font-size:14px;color:#4b2a66;font-weight:600" id="playTitle">Esperando inicio...</div>
+          <div style="margin-top:8px;color:#6b2f7f;font-size:13px" id="playHint">Ingresa tu nombre y pulsa <b>Iniciar</b>.</div>
+        </div>
+      </div>
+
+      <div style="margin-top:12px; display:none" id="synthesisBlock" class="synthesisArea card fade-in">
+        <div style="font-weight:700;margin-bottom:8px">Síntesis — escribe lo que entendiste</div>
+        <textarea id="synthesisInput" placeholder="Resume en 20–40 palabras: ¿Qué pasa?, Motivo, Solución, Datos importantes"></textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-top:8px">
+          <div class="small" id="wordCount">0 palabras</div>
+          <div style="display:flex;gap:8px">
+            <button id="btnSubmitSynth" class="btn small">Enviar síntesis</button>
+            <button id="btnSkipSynth" class="btn secondary small">Omitir</button>
+          </div>
+        </div>
+
+        <div class="guide" style="margin-top:10px">
+          <strong>📌 Guía de síntesis — incluye:</strong>
+          <ul style="margin:8px 0 0 18px">
+            <li><b>¿Qué pasa?</b> (situación principal)</li>
+            <li><b>Motivo</b> (causa/razón del problema)</li>
+            <li><b>Solución</b> (qué pide o qué busca)</li>
+            <li><b>Datos importantes</b> (fechas, montos, referencias)</li>
+          </ul>
+        </div>
+
+        <div id="synthAnalysis" style="margin-top:10px"></div>
+        <div id="timerBox" style="margin-top:10px;color:#b00020;font-weight:700"></div>
+      </div>
+
+      <div id="finalScreen" style="display:none; text-align:center; padding:20px;" class="fade-in">
+        <div id="finalNameDisplay" style="font-size:20px; color:#6b2f7f; margin-bottom:5px; font-weight:600; text-transform:uppercase; letter-spacing:1px"></div>
+        
+        <div style="font-size:24px; color:var(--morado); font-weight:bold;">¡Sesión Finalizada!</div>
+        <p>Has completado todos los escenarios.</p>
+        
+        <div style="margin:20px 0;">
+           <span style="font-size:48px; font-weight:800; color:var(--morado)" id="finalScoreDisplay">0/0</span>
+           <div style="color:#6b2f7f; font-weight:600">Puntaje Total</div>
+        </div>
+        
+        <p style="font-size:13px; color:#4b2a66">Descarga tu reporte para ver el detalle o inicia una nueva sesión.</p>
+
+        <div style="margin-top:20px; padding-top:15px; border-top:1px solid rgba(106,27,154,0.1);">
+            <div style="font-size:14px; color:#6b2f7f; margin-bottom:4px;">Rendimiento Global</div>
+            <div id="finalPercentResult" style="font-size:36px; font-weight:800; color:var(--lila);">0%</div>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <aside class="side" id="sidePanel">
+    <div class="card scoreBox">
+      <div style="font-size:13px;color:#5b2b7f">
+        <strong>Asesor:</strong> <span id="advisorShown">—</span>
+      </div>
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-top:6px">
+        <div>
+          <div class="small">Puntos totales</div>
+          <div class="scoreBig" id="scoreTotal">0 / 5</div>
+          <div class="small" id="percentText">0%</div>
+        </div>
+        <div style="text-align:right">
+          <div class="small">Estado</div>
+          <div id="statusBadge" class="badge warn">EN ESPERA</div>
+        </div>
+      </div>
+      <div style="margin-top:12px;font-size:13px;color:#5b2b7f">
+        <strong>Notas automáticas</strong>
+        <div id="autoNotes" style="margin-top:8px;line-height:1.3;color:#4b2a66">Aquí aparecerán recomendaciones.</div>
+      </div>
+    </div>
+  </aside>
+
+  <footer>
+    <div style="color:#4b2a66">Simulador de capacitación — Escucha activa y síntesis.</div>
+  </footer>
+</div>
+
+<script>
+/* =========================
+   Escenarios (5) — Cobranza
+   ========================= */
+const escenariosBase = [
+  {id:1, texto:"Hola, buenos días. Llamo porque hace dos semanas fui al hospital por una emergencia y tuve que pagar gastos médicos imprevistos. Este mes no pude cubrir la cuota de mi tarjeta y me apareció el aviso de retraso. Me gustaría ver una opción de pago parcial para no afectar mi historial.",
+   claves:{que:["llamo","tarjeta","retraso","no pude cubrir"], motivo:["hospital","emergencia","gastos medicos","gastos médicos"], solucion:["pago parcial","opcion","acuerdo"], datos:["dos semanas","cuota","historial"]}},
+  {id:2, texto:"Soy independiente y este mes mis ingresos bajaron mucho. No quiero atrasarme, pero me resulta difícil pagar el monto completo del préstamo. ¿Podemos ver un refinanciamiento o un plazo más largo con cuotas reducidas?",
+   claves:{que:["ingresos","bajaron","préstamo","prestamo"], motivo:["independiente","bajaron","irregular"], solucion:["refinanciamiento","plazo mas largo","cuotas reducidas","plazo"], datos:["este mes","monto completo"]}},
+  {id:3, texto:"Me aparece un cobro que no reconozco en el estado de cuenta. Nunca autoricé ese pago. Necesito que lo revisen y me indiquen cómo anularlo o devolverlo.",
+   claves:{que:["cobro","no reconozco","estado de cuenta"], motivo:["no autorice","no autoricé","error"], solucion:["revisen","anular","devolver","disputa"], datos:["pago","estado de cuenta"]}},
+  {id:4, texto:"Recibí una carta diciendo que debo tres cuotas atrasadas, pero ya realicé un pago hace una semana en ventanilla. Quiero que verifiquen el registro y actualicen el sistema.",
+   claves:{que:["tres cuotas","atrasadas","carta"], motivo:["ya realice un pago","ya realicé un pago","ventanilla"], solucion:["verifiquen","actualicen","registro"], datos:["una semana","carta","pago"]}},
+  {id:5, texto:"Llamaron de cobranza a mi trabajo y no quiero problemas allí. Necesito que cambien el número de contacto y que la información me llegue solo por correo.",
+   claves:{que:["llamaron","cobranza","trabajo"], motivo:["no quiero problemas","privacidad"], solucion:["cambiar numero","cambiar número","solo por correo","correo"], datos:["numero de contacto","número de contacto"]}}
+];
+
+/* ===== Estado ===== */
+let escenarios = [];
+let index = -1;
+let totalPoints = 0;
+let results = [];
+let countdown = null;    
+let timeLeft = 0;        
+const PER_QUESTION_SECONDS = 60;
+
+/* ===== DOM Elements ===== */
+const appContainer = document.getElementById('appContainer');
+const sidePanel = document.getElementById('sidePanel');
+const btnStart = document.getElementById('btnStart');
+const btnReplay = document.getElementById('btnReplay');
+const btnDownload = document.getElementById('btnDownload');
+const btnReset = document.getElementById('btnReset');
+const clientHidden = document.getElementById('clientHidden');
+const playHint = document.getElementById('playHint');
+const playTitle = document.getElementById('playTitle');
+const synthesisBlock = document.getElementById('synthesisBlock');
+const synthInput = document.getElementById('synthesisInput');
+const btnSubmitSynth = document.getElementById('btnSubmitSynth');
+const btnSkipSynth = document.getElementById('btnSkipSynth');
+const wordCount = document.getElementById('wordCount');
+const scoreTotal = document.getElementById('scoreTotal');
+const percentText = document.getElementById('percentText');
+const statusBadge = document.getElementById('statusBadge');
+const autoNotes = document.getElementById('autoNotes');
+const synthAnalysis = document.getElementById('synthAnalysis');
+const timerBox = document.getElementById('timerBox');
+const advisorNameEl = document.getElementById('advisorName');
+const advisorShown = document.getElementById('advisorShown');
+const gameArea = document.getElementById('gameArea');
+const finalScreen = document.getElementById('finalScreen');
+const finalScoreDisplay = document.getElementById('finalScoreDisplay');
+const finalNameDisplay = document.getElementById('finalNameDisplay');
+const finalPercentResult = document.getElementById('finalPercentResult');
+
+/* ===== Utils ===== */
+function norm(s){return (s||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();}
+function stopTimer(){ if(countdown){ clearInterval(countdown); countdown=null; } }
+function startTimer(){
+  stopTimer();
+  timeLeft = PER_QUESTION_SECONDS;
+  renderTimer();
+  countdown = setInterval(()=>{
+    timeLeft--;
+    renderTimer();
+    if(timeLeft<=0){ stopTimer(); autoAdvance("Tiempo agotado"); }
+  },1000);
+}
+function renderTimer(){
+  timerBox.textContent = `⏱ Tiempo restante: ${timeLeft}s`;
+  if(timeLeft < 10) timerBox.style.color = "#ef4444";
+  else timerBox.style.color = "#b00020";
+}
+
+/* ====== TTS System ====== */
+let cachedVoices = [];
+function loadVoices(){
+  if('speechSynthesis' in window){
+    cachedVoices = speechSynthesis.getVoices();
+    if(!cachedVoices || cachedVoices.length===0){
+      speechSynthesis.onvoiceschanged = ()=>{ cachedVoices = speechSynthesis.getVoices(); };
+    }
+  }
+}
+loadVoices();
+function pickSpanishVoice(){
+  if(!cachedVoices || cachedVoices.length===0) return null;
+  const prefer=['Google español','Microsoft Helena','Microsoft Sabina','Paulina','Monica','Jorge'];
+  for(const p of prefer){
+     const v = cachedVoices.find(voice => voice.name.includes(p));
+     if(v) return v;
+  }
+  return cachedVoices.find(v=> (v.lang||'').toLowerCase().startsWith('es')) || null;
+}
+function speak(text){
+  if(!('speechSynthesis' in window)){
+    alert('Tu navegador no soporta lectura en voz. Usa Chrome/Edge reciente.');
+    return false;
+  }
+  if(speechSynthesis.speaking) speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'es-ES';
+  const v = pickSpanishVoice(); if(v) u.voice = v;
+  u.rate = 1.0; 
+  speechSynthesis.speak(u);
+  return true;
+}
+
+/* ===== Lógica principal ===== */
+function initGame(){
+    escenarios = [...escenariosBase];
+    shuffleArray(escenarios);
+    index = -1;
+    totalPoints = 0;
+    results = [];
+    
+    // Reset UI
+    advisorShown.textContent = advisorNameEl.value || '—';
+    scoreTotal.textContent = `0 / ${escenarios.length}`;
+    percentText.textContent = "0%";
+    statusBadge.className = 'badge warn'; statusBadge.textContent='EN PROCESO';
+    autoNotes.textContent = 'Escucha con atención antes de escribir.';
+    
+    btnStart.style.display = 'none';
+    btnReplay.disabled = false;
+    btnReplay.style.display = 'inline-block';
+    btnDownload.style.display = 'none';
+    btnReset.style.display = 'none';
+    
+    synthesisBlock.style.display = 'none';
+    finalScreen.style.display = 'none';
+    gameArea.querySelector('.clientBox').style.display = 'flex';
+    gameArea.querySelector('.scenarioTitle').style.display = 'block';
+
+    sidePanel.style.display = 'block';
+    appContainer.style.gridTemplateColumns = '1fr 380px';
+
+    startScenario();
+}
+
+function startScenario(){
+  index++;
+  if(index>=escenarios.length){ finish(); return; }
+
+  const sc = escenarios[index];
+  clientHidden.textContent = sc.texto;
+
+  playTitle.textContent = `Cliente ${index+1} de ${escenarios.length}`;
+  playHint.textContent = '🔊 La IA está leyendo al cliente...';
+  playHint.style.color = "#d946ef"; 
+  synthesisBlock.style.display = 'none';
+  btnSubmitSynth.disabled = true;
+  btnSkipSynth.disabled = true;
+  synthInput.value = '';
+  wordCount.textContent = '0 palabras';
+  synthAnalysis.innerHTML = '';
+  timerBox.textContent = '';
+  
+  const ok = speak(sc.texto);
+
+  setTimeout(()=>{
+    synthesisBlock.style.display = 'block';
+    btnSubmitSynth.disabled = false;
+    btnSkipSynth.disabled = false;
+    playHint.textContent = '✍ Ahora escribe tu síntesis. Pulsa "Reproducir" si necesitas oír de nuevo.';
+    playHint.style.color = "#6b2f7f";
+    startTimer();
+    synthInput.focus();
+  }, ok ? 1500 : 1000);
+}
+
+function autoAdvance(reason){
+  if(results.length < index+1){
+    const sc = escenarios[index];
+    results.push({escenario:sc.id,texto:sc.texto,sintesis:"[TIEMPO AGOTADO/OMITIDO]",puntos:0,motivo:reason||'Auto'});
+    updateUI({points:0});
+  }
+  startScenario();
+}
+
+function evaluateSynth(text, sc){
+  const t = norm(text);
+  const found = {
+    que: sc.claves.que.some(k=> t.includes(norm(k))),
+    motivo: sc.claves.motivo.some(k=> t.includes(norm(k))),
+    solucion: sc.claves.solucion.some(k=> t.includes(norm(k))),
+    datos: sc.claves.datos.some(k=> t.includes(norm(k)))
+  };
+  const count = Object.values(found).filter(Boolean).length;
+  return {points: count>=2 ? 1 : 0, found, count};
+}
+
+/* Eventos */
+advisorNameEl.addEventListener('input',()=>{ advisorShown.textContent = advisorNameEl.value || '—'; });
+synthInput.addEventListener('input',()=>{
+  const n=(synthInput.value||'').trim().split(/\s+/).filter(Boolean).length;
+  wordCount.textContent = n + ' palabras';
+});
+
+btnStart.addEventListener('click',()=>{
+  if(!advisorNameEl.value.trim()) { alert("Por favor ingresa tu nombre."); return; }
+  initGame();
+});
+
+btnReplay.addEventListener('click',()=>{
+  const sc = escenarios[index]; if(sc) speak(sc.texto);
+});
+
+btnSubmitSynth.addEventListener('click',()=>{
+  stopTimer();
+  const sc = escenarios[index];
+  const ev = evaluateSynth(synthInput.value, sc);
+  totalPoints += ev.points;
+  results.push({escenario:sc.id, texto:sc.texto, sintesis:synthInput.value, puntos:ev.points});
+  updateUI(ev);
+  
+  btnSubmitSynth.textContent = "Guardado...";
+  setTimeout(()=> {
+      btnSubmitSynth.textContent = "Enviar síntesis";
+      startScenario();
+  }, 600);
+});
+
+btnSkipSynth.addEventListener('click',()=>{
+  stopTimer();
+  const sc = escenarios[index];
+  results.push({escenario:sc.id,texto:sc.texto,sintesis:"OMITIDO",puntos:0});
+  updateUI({points:0});
+  setTimeout(()=> startScenario(), 400);
+});
+
+btnDownload.addEventListener('click', generateCSV);
+btnReset.addEventListener('click', ()=>{
+    btnStart.style.display = 'block';
+    btnReset.style.display = 'none';
+    btnDownload.style.display = 'none';
+    finalScreen.style.display = 'none';
+    gameArea.querySelector('.clientBox').style.display = 'flex';
+    gameArea.querySelector('.scenarioTitle').style.display = 'block';
+    playTitle.textContent = "Listo para iniciar";
+    playHint.textContent = "Ingresa tu nombre y pulsa Iniciar.";
+    advisorNameEl.value = "";
+    advisorShown.textContent = "—";
+    scoreTotal.textContent = "0 / 5";
+    percentText.textContent = "0%";
+    statusBadge.className = "badge warn"; statusBadge.textContent = "SIN EVALUAR";
+    autoNotes.textContent = "Aquí aparecerán recomendaciones.";
+
+    sidePanel.style.display = 'block';
+    appContainer.style.gridTemplateColumns = '1fr 380px';
+});
+
+/* UI score + feedback */
+function updateUI(ev){
+  scoreTotal.textContent = `${totalPoints} / ${escenarios.length}`;
+  const pct = Math.round((totalPoints/escenarios.length)*100);
+  percentText.textContent = pct + '%';
+  
+  if(ev.points){
+    statusBadge.className='badge ok'; statusBadge.textContent='✅ BUENO';
+    synthAnalysis.innerHTML = "<div class='badge ok'>✔ Bien sintetizado</div>";
+    autoNotes.textContent = 'Excelente, capturaste los puntos clave.';
+  } else {
+    statusBadge.className='badge bad'; statusBadge.textContent='❌ MEJORAR';
+    synthAnalysis.innerHTML = "<div class='badge bad'>✖ Falta información</div>";
+    autoNotes.textContent = 'Intenta capturar más detalles: ¿Qué pasó?, ¿Por qué? y ¿Solución?';
+  }
+}
+
+/* Final */
+function finish(){
+  stopTimer();
+  if(window.speechSynthesis) speechSynthesis.cancel();
+  
+  synthesisBlock.style.display = 'none';
+  gameArea.querySelector('.clientBox').style.display = 'none';
+  gameArea.querySelector('.scenarioTitle').style.display = 'none';
+  
+  finalScreen.style.display = 'block';
+  
+  // Mostrar Puntos
+  finalScoreDisplay.textContent = `${totalPoints} / ${escenarios.length}`;
+  
+  // Mostrar Nombre
+  finalNameDisplay.textContent = "Asesor: " + (advisorNameEl.value || "Sin nombre");
+  
+  // Mostrar Porcentaje
+  const finalPct = Math.round((totalPoints/escenarios.length)*100);
+  finalPercentResult.textContent = finalPct + "%";
+
+  sidePanel.style.display = 'none';
+  appContainer.style.gridTemplateColumns = '1fr';
+
+  btnReplay.style.display = 'none';
+  btnDownload.style.display = 'inline-block';
+  btnReset.style.display = 'inline-block';
+}
+
+/* GENERACIÓN DE CSV OPTIMIZADA PARA EXCEL EN ESPAÑOL */
+function generateCSV(){
+  const advisor=(advisorNameEl.value||"Sin nombre").replace(/"/g,'""');
+  const date=new Date().toLocaleString();
+  
+  // BOM + "sep=;" fuerza a Excel a usar punto y coma como separador
+  let csv = "\uFEFF"; 
+  csv += "sep=;\n"; 
+  
+  // Encabezados claros
+  csv += `Asesor;"${advisor}"\n`;
+  csv += `Fecha;"${date}"\n\n`;
+  csv += `Escenario;Texto Cliente;Respuesta del Asesor;Puntos\n`;
+  
+  results.forEach(r=>{
+    const tCli = (r.texto||'').replace(/"/g,'""').replace(/(\r\n|\n|\r)/gm," ");
+    const tSyn = (r.sintesis||'').replace(/"/g,'""').replace(/(\r\n|\n|\r)/gm," ");
+    
+    // Estructura con ;
+    csv+=`${r.escenario};"${tCli}";"${tSyn}";${r.puntos}\n`;
+  });
+  
+  const pct = Math.round((totalPoints/escenarios.length)*100);
+  csv+=`\nTOTAL;;${pct}%;${totalPoints}\n`;
+  
+  const blob=new Blob([csv],{type:"text/csv;charset=utf-8;"});
+  const url=URL.createObjectURL(blob);
+  const a=document.createElement("a");
+  a.href=url; 
+  a.download=`Reporte_Sintesis_${advisor.replace(/\s+/g,'_')}.csv`;
+  document.body.appendChild(a); 
+  a.click(); 
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+function shuffleArray(array) {
+    for (let i = array.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [array[i], array[j]] = [array[j], array[i]];
+    }
+}
+
+window.addEventListener('beforeunload',()=>{ if(window.speechSynthesis) speechSynthesis.cancel(); });
+
+</script>
+</body>
+</html>
